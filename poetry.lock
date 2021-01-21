@@ -9,8 +9,8 @@ version = "3.6.3"
 [package.dependencies]
 async-timeout = ">=3.0,<4.0"
 attrs = ">=17.3.0"
-chardet = ">=2.0"
-multidict = ">=4.5"
+chardet = ">=2.0,<4.0"
+multidict = ">=4.5,<5.0"
 yarl = ">=1.0,<1.6.0"
 
 [package.extras]
@@ -74,7 +74,7 @@ python-versions = ">=3.5.3"
 version = "1.5.1"
 
 [package.dependencies]
-aiohttp = ">=3.6.0"
+aiohttp = ">=3.6.0,<3.7.0"
 
 [package.extras]
 docs = ["sphinx (1.8.5)", "sphinxcontrib-trio (1.1.1)", "sphinxcontrib-websupport"]
@@ -162,7 +162,7 @@ python-versions = ">=3.8,<4.0"
 version = "2.0.0"
 
 [package.dependencies]
-aiohttp = ">=3.6.2"
+aiohttp = ">=3.6.2,<4.0.0"
 flask = ">=1.1.2,<2.0.0"
 typing_extensions = ">=3.7.4,<4.0.0"
 werkzeug = ">=1.0.1,<2.0.0"
@@ -200,7 +200,7 @@ idna = ">=2.0"
 multidict = ">=4.0"
 
 [metadata]
-content-hash = "eb30b832cc53960eade1947acba472990b6c7e721af0b9df82ab9c5f7fa8a5c5"
+content-hash = "6bbb128588583311efd97b141b277355eb9015b9a18f070d271b957fb69eb17c"
 python-versions = "^3.8"
 
 [metadata.files]

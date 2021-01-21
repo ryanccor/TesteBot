@@ -1,5 +1,6 @@
 from discord import *
 from replit import db
+from keep_alive import keep_alive
 import pytz
 import re
 from datetime import datetime
@@ -8,12 +9,37 @@ import os
 client = Client()
 token = os.getenv('TOKEN')
 
+def is_all_or_equal(arg_1, arg_2):
+  if arg_1 == 'All' or arg_2 == 'All':
+    return True
+  else:
+    return arg_1 == arg_2
+
+def date_list_controller(date_list, date_int):
+  if date_list == ['All']:
+    return True
+  elif len(date_list) == 1:
+    return date_list[0] == date_int
+  elif len(date_list) == 2:
+    return  date_int >= date_list[0] and date_int <= date_list[1]
+  return False
+
+def as_timezone(dt, timezone):
+  return localize(dt).astimezone(pytz.timezone(timezone))
+
+def localize(dt):
+  return pytz.utc.localize(dt)
+
+def datetime_to_str(dt, format):
+  return dt.strftime(format)
+
+def str_to_datetime(str_dt,format):
+  return localize(datetime.strptime(str_dt,format))
 
 async def marcar_ponto(msg, target, date_list):
-    now_utc = pytz.utc.localize(datetime.now())
-    now = now_utc.astimezone(pytz.timezone('America/Araguaina'))
-    data = now.strftime("%d/%m/%Y")
-    hora = now.strftime("%H:%M:%S")
+    now = as_timezone(datetime.now(),'America/Araguaina')
+    data = datetime_to_str(now, "%d/%m/%Y")
+    hora = datetime_to_str(now,"%H:%M:%S")
     author = f'{msg.author}'
 
     users = db['users']
@@ -24,7 +50,7 @@ async def marcar_ponto(msg, target, date_list):
     else:
         users[author] = not users[author]
 
-    marcacao = (author, data, hora, users[author])
+    marcacao = (author, f'{data} {hora}', users[author])
 
     pontos.append(marcacao)
 
@@ -32,42 +58,28 @@ async def marcar_ponto(msg, target, date_list):
     db['users'] = users
 
     print(
-        f'PONTO - Usuário {marcacao[0]} marcou ponto as {marcacao[1]} - {marcacao[2]} de {"Entrada" if marcacao[3] else "Saida"}'
+        f'PONTO - Usuário {author} marcou ponto as {data} - {hora} de {"Entrada" if marcacao[2] else "Saida"}'
     )
     await msg.channel.send(
-        f'PONTO - {author}: {data} - {hora} - {"Entrada" if marcacao[3] else "Saida"} - registrado'
+        f'PONTO - {author}: {data} - {hora} - {"Entrada" if marcacao[2] else "Saida"} - registrado'
     )
 
 
-async def show_marcacoes(msg, target, date_list):
+async def show_marcacoes(msg, target_list, date_list):
     pontos = db['pontos']
     lista_retorno = str()
+    
+    for target in target_list:
+      for author, date_time, active in pontos:
+        _date_time = str_to_datetime(date_time, "%d/%m/%Y %H:%M:%S")
+        data = datetime_to_str(_date_time, '%d/%m/%Y')
+        hora = datetime_to_str(_date_time, '%H:%M:%S')
 
-    if target is None:
-        for i, j, k, l in pontos:
-            if date_list is None:
-                lista_retorno += f'LOG - {i} - {j} - {k} - {"Entrada" if l else "Saida"}\n'
-            elif len(date_list) == 1:
-                if j == date_list[0]:
-                    lista_retorno += f'LOG - {i} - {j} - {k} - {"Entrada" if l else "Saida"}\n'
-            elif len(date_list) == 2:
-                if j >= date_list[0] and j <= date_list[1]:
-                    lista_retorno += f'LOG - {i} - {j} - {k} - {"Entrada" if l else "Saida"}\n'
-    else:
-        for h in target:
-            for i, j, k, l in pontos:
-                if h == i:
-                    if date_list is None:
-                        lista_retorno += f'LOG - {i} - {j} - {k} - {"Entrada" if l else "Saida"}\n'
-                    elif len(date_list) == 1:
-                        if j == date_list[0]:
-                            lista_retorno += f'LOG - {i} - {j} - {k} - {"Entrada" if l else "Saida"}\n'
-                    elif len(date_list) == 2:
-                        if j >= date_list[0] and j <= date_list[1]:
-                            lista_retorno += f'LOG - {i} - {j} - {k} - {"Entrada" if l else "Saida"}\n'
-
+        if is_all_or_equal(target,author) and date_list_controller(date_list,_date_time.date()):
+          lista_retorno += f'LOG - {author} - {data} - {hora} - {"Entrada" if active else "Saida"}\n'
+ 
     print(
-        f'CONSULTA - Usuário {msg.author} consultou o historico de {target} com as datas {date_list}'
+        f'CONSULTA - Usuário {msg.author} consultou o historico de {target_list} com as datas {[datetime_to_str(i,"%d/%m/%Y") for i in date_list] if date_list != ["All"] else date_list}'
     )
     try:
         await msg.channel.send(lista_retorno)
@@ -78,6 +90,7 @@ async def show_marcacoes(msg, target, date_list):
 async def reset(msg, *args):
     if msg.author.permissions_in(msg.channel).administrator:
         db['pontos'] = []
+        db['users'] = []
         await msg.channel.send(
             f'RESET - Histórico de pontos apagados por {msg.author}')
         print(f'RESET - Histórico de pontos apagados por {msg.author}')
@@ -92,7 +105,7 @@ async def reset(msg, *args):
 
 async def help(msg, *args):
     await msg.channel.send(
-        'COMANDOS:\n\n/ponto - Para marcar o seu ponto \n\n /consulta -  Consultar pontos. Podem ser expecificados usuários e datas para a consulta \n Ex:  /consulta @usuário 01/01/2021 01/02/2021 \n\n /help - Ajuda'
+        'COMANDOS:\n\n/ponto - Para marcar o seu ponto \n\n /consulta -  Consultar pontos. Podem ser expecificados usuários e datas para a consulta. \n Ex:  /consulta @usuário 01/01/2021 01/02/2021\n -Pode ter mais de um usuário\n -Com apenas um data vai buscar registros do dia em questão.\n -Com mais de uma data irá buscar por intervalo de tempo \n\n /help - Ajuda \n\n Site para checar se o bot está rodando: https://testebot.fullmetalcomuni.repl.co'
     )
     print(f'AJUDA - {msg.author} pediu ajuda')
 
@@ -100,7 +113,7 @@ async def help(msg, *args):
 def get_dates(msg):
     re_date = re.findall(r'\d{2}/\d{2}/\d{4}', msg)
     date_list = [
-        datetime.strptime(i, '%d/%m/%Y').date().strftime("%d/%m/%Y")
+        datetime.strptime(i, '%d/%m/%Y').date()
         for i in re_date
     ]
     return date_list
@@ -122,6 +135,8 @@ async def on_ready():
 @client.event
 async def on_message(message, target=None, date_list=None):
     msg = message.content
+    target = ['All']
+    date_list = ['All']
 
     if message.mentions != []:
         target = [f'{i.name}#{i.discriminator}' for i in message.mentions]
@@ -135,5 +150,5 @@ async def on_message(message, target=None, date_list=None):
         if msg.startswith(i):
             await commands[i](message, target, date_list)
 
-
+keep_alive()
 client.run(token)
